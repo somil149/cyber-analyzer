@@ -1133,7 +1133,7 @@ async def health():
     return {"message": "Cybersecurity Analyzer API"}
 
 
-# Mount static files for frontend
+# Mount static files for frontend (only if directory exists)
 if os.path.exists("static"):
     app.mount("/", StaticFiles(directory="static", html=True), name="static")
 
