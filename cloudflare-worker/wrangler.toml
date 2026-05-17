@@ -5,14 +5,14 @@ compatibility_date = "2024-01-01"
 # Environment variables
 [vars]
 ENVIRONMENT = "production"
-BACKEND_URL = "https://your-backend-url.railway.app" # Replace with your Railway/Render URL
+BACKEND_URL = "https://backend-production-f67a.up.railway.app"
 
-# KV namespace for caching
-[[kv_namespaces]]
-binding = "CACHE"
-id = "your-kv-namespace-id" # Replace with your KV namespace ID
+# KV namespace for caching (create in Cloudflare dashboard first)
+# [[kv_namespaces]]
+# binding = "CACHE"
+# id = "your-kv-namespace-id" # Replace with your KV namespace ID
 
-# Routes
-[[routes]]
-pattern = "api.cyber-analyzer.pages.dev/*"
-zone_name = "pages.dev"
+# Routes (configure after deployment)
+# [[routes]]
+# pattern = "api.cyber-analyzer.pages.dev/*"
+# zone_name = "pages.dev"

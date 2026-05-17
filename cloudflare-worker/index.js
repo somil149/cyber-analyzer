@@ -57,10 +57,10 @@ async function handleAPIRequest(request, pathname, env, ctx) {
     });
   }
 
-  // Check cache for GET requests
-  if (request.method === 'GET') {
+  // Check cache for GET requests (if KV namespace is configured)
+  if (request.method === 'GET' && env.CACHE) {
     const cacheKey = `${ANALYSIS_CACHE_PREFIX}${pathname}`;
-    const cached = await env.CACHE?.get(cacheKey);
+    const cached = await env.CACHE.get(cacheKey);
     if (cached) {
       return new Response(cached, {
         headers: {
@@ -89,8 +89,9 @@ async function handleAPIRequest(request, pathname, env, ctx) {
     const response = await fetch(backendRequest);
     const responseData = await response.text();
 
-    // Cache successful GET responses
+    // Cache successful GET responses (if KV namespace is configured)
     if (request.method === 'GET' && response.ok && env.CACHE) {
+      const cacheKey = `${ANALYSIS_CACHE_PREFIX}${pathname}`;
       await env.CACHE.put(cacheKey, responseData, { expirationTtl: CACHE_TTL });
     }
 
