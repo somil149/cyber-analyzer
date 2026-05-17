@@ -6,6 +6,7 @@ import ssl
 import socket
 import json
 from datetime import datetime, timedelta
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -23,7 +24,17 @@ from mcp_servers import create_semgrep_server
 
 load_dotenv(override=True)
 
-app = FastAPI(title="Cybersecurity Analyzer API")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Lifespan context manager for startup/shutdown events."""
+    # Startup
+    print("Starting Cybersecurity Analyzer API...")
+    print(f"Environment: {os.getenv('ENVIRONMENT', 'development')}")
+    yield
+    # Shutdown
+    print("Shutting down Cybersecurity Analyzer API...")
+
+app = FastAPI(title="Cybersecurity Analyzer API", lifespan=lifespan)
 
 # Configure CORS for development and production
 cors_origins = [
@@ -1130,10 +1141,11 @@ async def analyze_code(request: AnalyzeRequest) -> SecurityReport:
 @app.get("/health")
 async def health():
     """Health check endpoint."""
-    return {"message": "Cybersecurity Analyzer API"}
+    return {"status": "healthy", "message": "Cybersecurity Analyzer API"}
 
 
 # Mount static files for frontend (only if directory exists)
+# This must come after the health endpoint to avoid route conflicts
 if os.path.exists("static"):
     app.mount("/", StaticFiles(directory="static", html=True), name="static")
 
