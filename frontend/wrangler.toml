@@ -1,9 +1,6 @@
 name = "cyber-analyzer-frontend"
 compatibility_date = "2024-01-01"
+pages_build_output_dir = "out"
 
 [env.production]
 vars = { ENVIRONMENT = "production" }
-
-[[env.production.routes]]
-pattern = "cyber-analyzer.pages.dev"
-custom_domain = true

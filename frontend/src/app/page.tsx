@@ -10,7 +10,7 @@ import AnalysisResults from '@/components/AnalysisResults';
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 
   (process.env.NODE_ENV === 'development' && typeof window !== 'undefined' && window.location?.hostname === 'localhost' 
     ? 'http://localhost:8000' 
-    : 'https://api.cyber-analyzer.pages.dev'); // Cloudflare Worker API Gateway
+    : 'https://cyber-analyzer-api-gateway.goyal-somil2011.workers.dev'); // Cloudflare Worker API Gateway
 
 
 /**

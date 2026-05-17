@@ -1,6 +1,7 @@
 name = "cyber-analyzer-api-gateway"
 main = "index.js"
 compatibility_date = "2024-01-01"
+account_id = "215b284ea2de655521612052f1647cb0"
 
 # Environment variables
 [vars]
