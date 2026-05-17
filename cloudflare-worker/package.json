@@ -1,0 +1,13 @@
+{
+  "name": "cyber-analyzer-api-gateway",
+  "version": "1.0.0",
+  "description": "Cloudflare Worker API Gateway for Cybersecurity Analyzer",
+  "main": "index.js",
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "dev": "wrangler dev"
+  },
+  "devDependencies": {
+    "wrangler": "^3.0.0"
+  }
+}
