@@ -1,0 +1,129 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  test-backend:
+    runs-on: ubuntu-latest
+    name: Test Backend
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        run: pip install uv
+
+      - name: Install dependencies
+        working-directory: ./backend
+        run: uv pip install -r requirements.txt
+
+      - name: Check Python syntax
+        working-directory: ./backend
+        run: python -m py_compile server.py
+
+  test-frontend:
+    runs-on: ubuntu-latest
+    name: Test Frontend
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ./frontend
+        run: npm ci
+
+      - name: Run linter
+        working-directory: ./frontend
+        run: npm run lint
+        continue-on-error: true
+
+      - name: Run type check
+        working-directory: ./frontend
+        run: npm run typecheck
+        continue-on-error: true
+
+      - name: Build frontend
+        working-directory: ./frontend
+        run: npm run build
+
+  deploy-all:
+    needs: [test-backend, test-frontend]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    name: Deploy to Cloud
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to Railway
+        run: |
+          npm install -g @railway/cli
+          railway up --service backend
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+
+      - name: Deploy Cloudflare Worker
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: deploy --name cyber-analyzer-api-gateway
+          workingDirectory: cloudflare-worker
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: ./frontend
+        run: npm ci
+
+      - name: Build frontend
+        working-directory: ./frontend
+        run: npm run build
+
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy out --project-name=cyber-analyzer
+          workingDirectory: frontend
+
+      - name: Health check
+        run: |
+          echo "Waiting for deployments to be ready..."
+          sleep 30
+          
+          echo "Checking Railway backend..."
+          curl -f https://backend-production-f67a.up.railway.app/health || exit 1
+          
+          echo "Checking Cloudflare Worker..."
+          curl -f https://cyber-analyzer-api-gateway.goyal-somil2011.workers.dev/health || exit 1
+          
+          echo "Checking Cloudflare Pages..."
+          curl -f https://cyber-analyzer.pages.dev || exit 1
+          
+          echo "All health checks passed!"
