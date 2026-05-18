@@ -938,32 +938,81 @@ def create_security_agent(semgrep_server) -> Agent:
 
 async def run_security_analysis(code: str) -> SecurityReport:
     """Execute the security analysis workflow."""
-    with trace("Security Researcher"):
-        async with create_semgrep_server() as semgrep:
-            agent = create_security_agent(semgrep)
-            try:
-                with tempfile.NamedTemporaryFile(  # Creates a temporary file locally with teh code
-                    mode="w", suffix=".py", delete=False
-                ) as temp:
-                    temp.write(code)
-                    temp_path = temp.name
-                try:
-                    result = await Runner.run(
-                        agent, input=get_analysis_prompt(code, temp_path)
-                    )  # Sends code and path to the file
-                    # Changed the following two lines to sort by CVSS in descending order
-                    sorted_report = result.final_output_as(SecurityReport)
-                    sorted_report.issues.sort(key=lambda issue: issue.cvss_score, reverse=True)
+    print("Starting security analysis...")
 
-                    return sorted_report
-                finally:
+    try:
+        with trace("Security Researcher"):
+            print("Creating Semgrep MCP server...")
+            async with create_semgrep_server() as semgrep:
+                print("Semgrep server created successfully")
+                agent = create_security_agent(semgrep)
+                try:
+                    with tempfile.NamedTemporaryFile(  # Creates a temporary file locally with teh code
+                        mode="w", suffix=".py", delete=False
+                    ) as temp:
+                        temp.write(code)
+                        temp_path = temp.name
+                    print(f"Created temporary file: {temp_path}")
                     try:
-                        os.unlink(temp_path)
-                    except OSError:
-                        pass
-            except Exception as err:
-                print(f"Unexpected {err=}, {type(err)=}")
-                raise
+                        print("Running security agent...")
+                        result = await Runner.run(
+                            agent, input=get_analysis_prompt(code, temp_path)
+                        )  # Sends code and path to the file
+                        print("Agent run completed successfully")
+                        # Changed the following two lines to sort by CVSS in descending order
+                        sorted_report = result.final_output_as(SecurityReport)
+                        sorted_report.issues.sort(key=lambda issue: issue.cvss_score, reverse=True)
+
+                        return sorted_report
+                    finally:
+                        try:
+                            os.unlink(temp_path)
+                            print(f"Cleaned up temporary file: {temp_path}")
+                        except OSError:
+                            pass
+                except Exception as err:
+                    print(f"Unexpected {err=}, {type(err)=}")
+                    raise
+    except Exception as mcp_error:
+        print(f"Semgrep MCP server failed: {mcp_error}")
+        print("Falling back to OpenAI-only analysis...")
+
+        # Fallback: Run analysis without Semgrep
+        from agents import Agent
+
+        fallback_agent = Agent(
+            name="Security Researcher",
+            instructions=SECURITY_RESEARCHER_INSTRUCTIONS.replace(
+                "You have access to a semgrep_scan tool that can help identify security vulnerabilities.",
+                "Semgrep analysis tool is currently unavailable. Conduct thorough manual security analysis."
+            ).replace(
+                "1. First, use the semgrep_scan tool ONCE to scan the provided code (config: \"auto\")",
+                "1. Conduct comprehensive manual security analysis of the code"
+            ).replace(
+                "2. Review and analyze the semgrep results - count how many issues semgrep found",
+                "2. Review the code systematically for common vulnerability patterns"
+            ).replace(
+                "3. Do NOT call semgrep_scan again - you already have the results",
+                "3. Check for: SQL injection, XSS, command injection, insecure dependencies, weak cryptography, etc."
+            ).replace(
+                "5. In your summary, clearly state: \"Semgrep found X issues, and I identified Y additional issues\"",
+                "5. In your summary, state: \"Manual security analysis completed (Semgrep unavailable)\""
+            ),
+            model="gpt-4o"
+        )
+
+        try:
+            print("Running fallback security agent...")
+            result = await Runner.run(
+                fallback_agent, input=f"Please analyze this Python code for security vulnerabilities:\n\n{code}"
+            )
+            print("Fallback agent run completed successfully")
+            sorted_report = result.final_output_as(SecurityReport)
+            sorted_report.issues.sort(key=lambda issue: issue.cvss_score, reverse=True)
+            return sorted_report
+        except Exception as fallback_error:
+            print(f"Fallback analysis also failed: {fallback_error}")
+            raise Exception(f"Both Semgrep and fallback analysis failed: {str(mcp_error)}, {str(fallback_error)}")
 
 
 def format_analysis_response(code: str, report: SecurityReport) -> SecurityReport:
